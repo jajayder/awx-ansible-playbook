@@ -1,0 +1,75 @@
+- name: Provisionar Docker, Minikube e AWX no Red Hat 9.5
+  hosts: all
+  become: yes
+  vars:
+    awx_version: "17.0.1"
+    awx_install_dir: /opt/awx
+    awx_url: "https://github.com/ansible/awx/releases/download/${awx_version}/awx-${awx_version}.tar.gz"
+
+  tasks:
+
+  # 1. Instalar Docker
+  - name: Instalar pacotes necessários para Docker
+    dnf:
+      name:
+        - yum-utils
+        - device-mapper-persistent-data
+        - lvm2
+      state: present
+
+  - name: Configurar repositório do Docker CE
+    ansible.builtin.shell: |
+      dnf config-manager --add-repo=https://download.docker.com/linux/centos/docker-ce.repo
+
+  - name: Instalar Docker
+    dnf:
+      name:
+        - docker-ce
+        - docker-ce-cli
+        - containerd.io
+      state: present
+
+  - name: Iniciar e habilitar Docker
+    systemd:
+      name: docker
+      state: started
+      enabled: yes
+
+  # 2. Instalar Minikube -> dependência kubectl + binário minikube
+ # - name: Instalar kubectl
+ #   get_url:
+#      url: https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl
+#      dest: /usr/local/bin/kubectl
+#      mode: '0755'
+
+  - name: Instalar minikube
+    get_url:
+      url: https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64
+      dest: /usr/local/bin/minikube
+      mode: '0755'
+
+  - name: Verificar usando grupos de cgroup2
+    shell: "minikube start --driver=none || true"
+    args:
+      warn: false
+    register: minikube_test
+    failed_when: false
+
+  - name: Baixar código fonte do AWX
+    get_url:
+      url: "{{ awx_url }}"
+      dest: /tmp/awx.tar.gz
+
+  - name: Extrair fonte do AWX
+    unarchive:
+      src: /tmp/awx.tar.gz
+      dest: "{{ awx_install_dir }}"
+      remote_src: true
+
+  - name: Instalar roles e coleções Ansible para AWX
+    ansible.builtin.shell: |
+      cd {{ awx_install_dir }}/awx-{{ awx_version }}/installer
+      ansible-galaxy install -r requirements.yml
+      ansible-playbook -i inventory install.yml
+    args:
+      chdir: "{{ awx_install_dir }}/awx-{{ awx_version }}/installer"
