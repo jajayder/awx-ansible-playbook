@@ -1,1 +1,9 @@
-
+---
+- name: restart nodes HyperV
+  collections:
+    - community.windows
+    - ansible.windows
+  hosts: all
+  tasks:
+    - name: acessar servidor HyperV
+      ansible
