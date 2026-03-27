@@ -5,5 +5,57 @@
     - ansible.windows
   hosts: all
   tasks:
-    - name: acessar servidor HyperV
-      ansible
+# -------- INICIO Processos de Drain, restart e retorno NODE 1
+    - name: Drain roles servidor "{{ node1 }}"
+      ansible.windows.win_shell: |
+        Suspend-ClusterNode -Name "{{ node1 }}" -Drain
+      delegate_to: "{{ node1 }}"
+
+    - name: Restart "{{ node1 }}"
+      ansible.winfows.win_reboot:
+        reboot_timeout: 1800
+        msg: "Reinício controlado via AWX - {{ node1 }}"
+      delegate_to: "{{ node1 }}"
+      
+    - name: Validar retorno restart "{{ node1 }}"
+      ansible.windows.win_shell: |
+        (Get-CLusterNode -Name "{{ node1 }}".State
+      register: node1_state
+      retries: 10
+      delay: 30
+      until: node1_state.stdout.strip() == "Up"
+      delegate_to: "{{ node1 }}"
+
+    - name: Resume Fail Roles Back "{{ node1 }}"
+      ansible.windows.win_shell: |
+        Resume-ClusterNode -Name "{{ node1 }}" -Failback Immediate
+      delegate_to: "{{ node1 }}"
+# -------- FIM Processos de Drain, restart e retorno NODE 1
+
+# -------- INICIO Processos de Drain, restart e retorno NODE 2      
+      - name: Drain roles servidor "{{ node2 }}"
+      ansible.windows.win_shell: |
+        Suspend-ClusterNode -Name "{{ node2 }}" -Drain
+      delegate_to: "{{ node2 }}"
+
+    - name: Restart "{{ node2 }}"
+      ansible.winfows.win_reboot:
+        reboot_timeout: 1800
+        msg: "Reinício controlado via AWX - {{ node2 }}"
+      delegate_to: "{{ node2 }}"
+      
+    - name: Validar retorno restart "{{ node2 }}"
+      ansible.windows.win_shell: |
+        (Get-CLusterNode -Name "{{ node2 }}".State
+      register: node2_state
+      retries: 10
+      delay: 30
+      until: node2_state.stdout.strip() == "Up"
+      delegate_to: "{{ node2 }}"
+
+    - name: Resume Fail Roles Back "{{ node2 }}"
+      ansible.windows.win_shell: |
+        Resume-ClusterNode -Name "{{ node2 }}" -Failback Immediate
+      delegate_to: "{{ node2 }}"
+# -------- FIM Processos de Drain, restart e retorno NODE 2
+
